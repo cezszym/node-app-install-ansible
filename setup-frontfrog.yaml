@@ -1,0 +1,50 @@
+- hosts: app_nodes
+  vars:
+    GITHUB_REPO: https://github.com/cezszym/frontfrog.git
+  tasks:
+    - name: Install git
+      become: yes
+      yum:
+        name: git
+        state: present
+    - name: Install nvm
+      shell: >
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | sh
+        creates=/home/ec2-user/.nvm/nvm.sh
+    - name: Install node
+      shell: 'source /home/ec2-user/.nvm/nvm.sh && nvm install node'
+      tags: nvm
+    - name: Change npm ownership
+      become: yes
+      file:
+        path: /home/ec2-user/.nvm/versions/node/v8.11.3
+        owner: ec2-user
+        recurse: yes
+    - name: Update NPM
+      npm:
+        name: npm
+        global: yes
+        state: latest
+
+    - name: Install pm2
+      npm:
+        name: pm2
+        global: yes
+    - name: Create dir for app
+      file:
+        path: ~/node-app
+        state: directory
+    - name: Clone github repository
+      git:
+        repo: '{{ GITHUB_REPO }}'
+        dest: ~/node-app
+    - name: Install dependencies based on package.json
+      npm:
+        path: ~/node-app
+
+    - name: Delete old pm2 process
+      command: pm2 delete ws-node
+      ignore_errors: yes
+
+    - name: Start app
+      command: pm2 start /home/ec2-user/node-app/app.js
